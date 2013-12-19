@@ -24,11 +24,15 @@ import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -76,7 +80,7 @@ public class InterfaceUptimeGUI extends JPanel{
 											    "http://www.gnu.org/licenses/gpl.html\r\n\r\n";
     
     protected static final String aboutText = "Mark's Interface Uptime Finder\r\n" +
-    										  "Version 1.0 (11 December 2013)\r\n" +
+    										  "Version 1.1 (19 December 2013)\r\n" +
     										  "by Mark Ciecior, CCIE #28274\r\n" +
     										  "www.github.com/markciecior/InterfaceUptime";
     
@@ -192,6 +196,18 @@ public class InterfaceUptimeGUI extends JPanel{
 
     }
 
+    private static final Pattern VALID_PATTERN = Pattern.compile("[0-9]+|[a-zA-Z]+");
+
+    private List<String> parse(String toParse) {
+    	//Use this to break the interface names into chunks of digits and letters
+        List<String> chunks = new LinkedList<String>();
+        Matcher matcher = VALID_PATTERN.matcher(toParse);
+        while (matcher.find()) {
+            chunks.add( matcher.group() );
+        }
+        return chunks;
+    }
+    
 	public InterfaceUptimeGUI() {
 		
 		super();
@@ -232,7 +248,75 @@ public class InterfaceUptimeGUI extends JPanel{
         model = new MyTableModel();
         sorter = new TableRowSorter<MyTableModel>(model);
         table = new JTable(model);
+        Comparator<String> comparator = new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				//Break up our interface name into chunks of letters and digits
+				List<String> list1 = parse(o1);
+				List<String> list2 = parse(o2);
+				Integer int1 = new Integer(0);
+				Integer int2 = new Integer(0);
+				String str1 = new String();
+				String str2 = new String();
+				
+					//Go through each chunk and compare them
+					//Try to compare number value if possible, otherwise compare String value
+					//If both strings are interface names(Gix/y, Fax/y, Tex/y), treat them the same so Gi1/0/1 will be above Fa2/0/1
+					for (int i=0; i < list1.size(); i++) {
+						str1 = "";
+						str2 = "";
+						try {
+							int1 = Integer.parseInt(list1.get(i));
+						} catch (NumberFormatException f) {
+							int1 = null;
+							str1 = list1.get(i);
+						} catch (ArrayIndexOutOfBoundsException a) {
+							return -1;
+						}
+						try {
+							int2 = Integer.parseInt(list2.get(i));
+						} catch (NumberFormatException f) {
+							int2 = null;
+							str2 = list2.get(i);
+						} catch (ArrayIndexOutOfBoundsException a) {
+							return 1;
+						}
+						if (int1 == null && int2 == null){
+							String pre1 = str1.substring(0,2);
+							String pre2 = str2.substring(0,2);
+							if ( (pre1.equalsIgnoreCase("Gi") || pre1.equalsIgnoreCase("Fa") || pre1.equalsIgnoreCase("Te")) &&
+								 (pre2.equalsIgnoreCase("Gi") || pre2.equalsIgnoreCase("Fa") || pre2.equalsIgnoreCase("Te"))) {
+									 continue;
+								 }
+							if (str1.compareTo(str2) == 0) {
+								continue;
+							} else { return str1.compareTo(str2); }
+						} else if (int1 == null && int2 != null) {
+							return -1;
+						} else if (int1 != null && int2 == null) {
+							return 1;
+						} else {
+							if (int1.compareTo(int2) == 0) {
+								continue;
+							} else { return int1.compareTo(int2); }
+						}
+					}
+					return 0;
+			}
+        	
+        };
+        Comparator<TimeTicks> comparatorTime = new Comparator<TimeTicks>() {
+        	//Use the default compareTo method in the TimeTicks class
+			@Override
+			public int compare(TimeTicks o1, TimeTicks o2) {
+				return o1.compareTo(o2);
+			}
+        };
+        sorter.setComparator(0, comparator);
+        sorter.setComparator(2, comparatorTime);
         table.setRowSorter(sorter);
+        table.getRowSorter().toggleSortOrder(0);
         table.setPreferredScrollableViewportSize(new Dimension(500, 400));
         table.setFillsViewportHeight(true);
  
@@ -374,7 +458,6 @@ public class InterfaceUptimeGUI extends JPanel{
 					save(IFNAME_TO_CHANGETIME, "/home/mark/Desktop/int/IFNAME_TO_CHANGETIME.txt");
 					save(IFNAME_TO_INTSTATUS, "/home/mark/Desktop/int/IFNAME_TO_INTSTATUS.txt");
 				} catch (NotSerializableException g) {
-					// TODO Auto-generated catch block
 					g.printStackTrace();
 				}*/
 				
@@ -407,6 +490,7 @@ public class InterfaceUptimeGUI extends JPanel{
 		
 		public void done() {
 			statusLabel.setText("Scanning complete");
+			filterText.requestFocusInWindow();
 		}
 	}
 	
@@ -426,19 +510,16 @@ public class InterfaceUptimeGUI extends JPanel{
 
 	@Override
 	public int getRowCount() {
-		// TODO Auto-generated method stub
 		return IFNAME_TO_CHANGETIME.size();
 	}
 
 	@Override
 	public int getColumnCount() {
-		// TODO Auto-generated method stub
 		return columnNames.length;
 	}
 
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
-		// TODO Auto-generated method stub
 		return data[rowIndex][columnIndex];
 	}
 	public String getColumnName(int column){
