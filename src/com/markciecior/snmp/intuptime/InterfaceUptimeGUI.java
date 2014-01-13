@@ -17,7 +17,11 @@
 
 package com.markciecior.snmp.intuptime;
 
+import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -34,7 +38,10 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -42,18 +49,17 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.UIManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableRowSorter;
-
-import javax.swing.*;
-import javax.swing.event.*;
-import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
 
 import org.snmp4j.smi.TimeTicks;
 
@@ -77,10 +83,14 @@ public class InterfaceUptimeGUI extends JPanel{
 											    "with this program; if not, write to the Free Software Foundation, Inc.,\r\n" +
 											    "51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\r\n\r\n" +
 											    
-											    "http://www.gnu.org/licenses/gpl.html\r\n\r\n";
+											    "http://www.gnu.org/licenses/gpl.html\r\n\r\n" +
+											    
+											    "This program makes use of the SNMP4j API.\r\n" +
+											    "Its license can be found below:\r\n\r\n" +
+											    "SNMP4j: http://www.snmp4j.org/LICENSE-2_0.txt\r\n";
     
     protected static final String aboutText = "Mark's Interface Uptime Finder\r\n" +
-    										  "Version 1.1 (19 December 2013)\r\n" +
+    										  "Version 1.2 (13 January 2014)\r\n" +
     										  "by Mark Ciecior, CCIE #28274\r\n" +
     										  "www.github.com/markciecior/InterfaceUptime";
     
@@ -90,7 +100,10 @@ public class InterfaceUptimeGUI extends JPanel{
     										 "3) View the output in the center table.\r\n" +
     										 "4) Filter for the interface in which you're interested using the\r\n" +
     										 "  'Filter Interfaces' field on the bottom.\r\n" +
-    										 "5) Enter a new address/hostname/community string and start again!\r\n";
+    										 "5) Enter a new address/hostname/community string and start again!\r\n\r\n" +
+    										 
+    										 "NOTE: The timestams are accurate to within sysUpTime's 32-bit ability\r\n" +
+    										 "to track uptime, specifically 497 days.";
 
 	
 	private static final long serialVersionUID = 1L;
@@ -428,7 +441,7 @@ public class InterfaceUptimeGUI extends JPanel{
 		@SuppressWarnings({ "rawtypes", "unchecked" })
 		@Override
 		protected Void doInBackground() throws Exception {
-			
+
 			if (!TESTING){
 
 				final SNMPManager man = new SNMPManager();
@@ -438,6 +451,7 @@ public class InterfaceUptimeGUI extends JPanel{
 					f.printStackTrace();
 				}
 				
+				try {
 				String addr = switchText.getText();
 				String comm = snmpText.getText();
 				Long uptime = man.getUptime(addr, comm);
@@ -453,13 +467,24 @@ public class InterfaceUptimeGUI extends JPanel{
 				
 				IFNAME_TO_INTSTATUS = new HashMap<String,String>();
 				IFNAME_TO_INTSTATUS = man.getIfNameToIntStatus(IFINDEX_TO_IFNAME, addr, comm);
-			
-				/*try {
+				} catch (Exception e) {e.printStackTrace(); System.exit(1);
+					
+				}
+				try {
 					save(IFNAME_TO_CHANGETIME, "/home/mark/Desktop/int/IFNAME_TO_CHANGETIME.txt");
 					save(IFNAME_TO_INTSTATUS, "/home/mark/Desktop/int/IFNAME_TO_INTSTATUS.txt");
+					
+					//String path = System.getProperty("user.home") + "/" + "IFNAME_TO_CHANGETIME.txt";
+					//path += "IFNAME_TO_CHANGETIME.txt";
+					//save(IFNAME_TO_CHANGETIME, path);
+					//printHashMap(IFNAME_TO_CHANGETIME, IFNAME_TO_INTSTATUS);
+					//path = System.getProperty("user.home") + "/" + "IFNAME_TO_INTSTATUS.txt";
+					//path += "IFNAME_TO_INTSTATUS.txt";
+					//save(IFNAME_TO_INTSTATUS, path);
+					
 				} catch (NotSerializableException g) {
 					g.printStackTrace();
-				}*/
+				}
 				
 			} else {
 				IFNAME_TO_CHANGETIME = open("/home/mark/Desktop/int/IFNAME_TO_CHANGETIME.txt");
